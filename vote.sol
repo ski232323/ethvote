@@ -8,6 +8,8 @@ interface IVotes {
 
 contract SimpleVoting {
     IVotes public token;
+    address public owner;
+    bool public votingEnded;
 
     struct Proposal {
         string description;
@@ -21,6 +23,7 @@ contract SimpleVoting {
     uint256 public votingBlock; // bloc où on prend le snapshot de la supply
 
     constructor(address tokenAddress, string[] memory proposalDescriptions) {
+        owner = msg.sender;
         token = IVotes(tokenAddress);
         for (uint i = 0; i < proposalDescriptions.length; i++) {
             proposals.push(Proposal({
@@ -29,14 +32,30 @@ contract SimpleVoting {
             }));
         }
         votingBlock = block.number;
+        votingEnded = false;
     }
 
-    function vote(uint proposalId) public {
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
+    }
+
+    modifier voteAllowed() {
+        require(!votingEnded, "Voting has ended");
+        _;
+    }
+
+    function vote(uint proposalId) public voteAllowed {
         require(!hasVoted[msg.sender], "Already voted");
         uint256 voterPower = token.getVotes(msg.sender);
         require(voterPower > 0, "No voting power");
         proposals[proposalId].voteCount += voterPower;
         hasVoted[msg.sender] = true;
+    }
+
+    /// @notice Terminer le vote (seulement propriétaire)
+    function endVoting() public onlyOwner {
+        votingEnded = true;
     }
 
     /// @notice Renvoie l'index de la proposition gagnante (celle avec le plus de votes)
